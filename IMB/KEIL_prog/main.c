@@ -53,8 +53,8 @@ void EXTI15_10_IRQHandler(void) {
     /* setup TIM2
     Clock by default at 16 MHz*/
     RCC->APB1ENR |= 1;              /* enable TIM2 clock */
-    TIM2->PSC = 1600 - 1;          // divided by 1600-> f = 10 kHz
-    TIM2->ARR = 5 - 1;           // divided by 5-> f2 = 1 kHz max! Res = 0,5 ms
+    TIM2->PSC = 160 - 1;          // divided by 160-> f = 100 kHz
+    TIM2->ARR = 5 - 1;           // divided by 5-> f2 = 10 kHz max! Res = 50 µs-> 1/2 Period time
     TIM2->CR1 = 1;                  /* enable counter */
 
     TIM2->DIER |= 1;                /* enable UIE */
@@ -74,12 +74,12 @@ void delayMs(int n) {
 void TIM2_IRQHandler(void) {
     TIM2->SR = 0;                   /* clear UIF */
   //GPIOA->ODR ^= 0x20;				/* toggle LED */
-	
+	//Incoming f for EXTI 50 Hz; detection f = 20 kHz
 	pulseCount += 1;//raise the value every time the Handler starts-> every 1ms
-	if(pulseCount ==5){//after 4ms-> 5-1 because we start to count form 0
+	if(pulseCount == 80 - 1){//after 4ms-> 80-1 because we start to count form 0
 		GPIOA->BSRR = 0x00000020;   /* turn on LED */
 	}
-	if(pulseCount == 7){//after 6ms-> 6-1 because we start to count form 0
+	if(pulseCount == 100 - 1){//after 5ms-> 100-1 because we start to count form 0
 		GPIOA->BSRR = 0x00200000;   /* turn off LED */
 	}
 
