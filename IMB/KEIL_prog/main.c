@@ -50,10 +50,11 @@ int main(void) {
 
 void EXTI15_10_IRQHandler(void) {
     
-    /* setup TIM2 */
+    /* setup TIM2
+    Clock by default at 16 MHz*/
     RCC->APB1ENR |= 1;              /* enable TIM2 clock */
-    TIM2->PSC = 1600 - 1;          /* divided by 16000 */
-    TIM2->ARR = 10 - 1;           /* divided by 1000 */
+    TIM2->PSC = 1600 - 1;          // divided by 1600-> f = 10 kHz
+    TIM2->ARR = 5 - 1;           // divided by 5-> f2 = 1 kHz max! Res = 0,5 ms
     TIM2->CR1 = 1;                  /* enable counter */
 
     TIM2->DIER |= 1;                /* enable UIE */
