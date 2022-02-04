@@ -16,7 +16,8 @@
  */
 
 #include "stm32f4xx.h"
-int8_t pulseCount = 0;
+int32_t pulseCount = 0; //THIS NEEDS to be int32_t, otherwise it will overflow
+//before the Interrupt kicks in-> took me serveral hours to find out xD
 void delayMs(int n);
 
 int main(void) {
@@ -55,7 +56,7 @@ void EXTI15_10_IRQHandler(void) {
     RCC->APB1ENR |= 1;              /* enable TIM2 clock */
     TIM2->PSC = 160 - 1;          // divided by 160-> f = 100 kHz
     TIM2->ARR = 5 - 1;           // divided by 5-> f2 = 10 kHz max! Res = 50 µs-> 1/2 Period time
-    TIM2->CR1 = 1;                  /* enable counter */
+    TIM2->CR1 = 0x00010001;      // enable counter in HEX please (debug reason)
 
     TIM2->DIER |= 1;                /* enable UIE */
     NVIC_EnableIRQ(TIM2_IRQn);      /* enable interrupt in NVIC */
@@ -72,8 +73,8 @@ void delayMs(int n) {
 
 
 void TIM2_IRQHandler(void) {
-    TIM2->SR = 0;                   /* clear UIF */
-  //GPIOA->ODR ^= 0x20;				/* toggle LED */
+	TIM2->SR = 0;                   /* clear UIF */
+  	//GPIOA->ODR ^= 0x20;				/* toggle LED */
 	//Incoming f for EXTI 50 Hz; detection f = 20 kHz
 	pulseCount += 1;//raise the value every time the Handler starts-> every 1ms
 	if(pulseCount == 80 - 1){//after 4ms-> 80-1 because we start to count form 0
@@ -81,8 +82,11 @@ void TIM2_IRQHandler(void) {
 	}
 	if(pulseCount == 100 - 1){//after 5ms-> 100-1 because we start to count form 0
 		GPIOA->BSRR = 0x00200000;   /* turn off LED */
+		//IMPORTANT
+		pulseCount = 0; //resets counter^^ so we're ready for the next EXTI
+		TIM2->CR1 = 0x0000; //DISABLE the Timer, so we can Synch & Enable the Timer with the next EXTI
 	}
-
+	
 }
 
 
