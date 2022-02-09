@@ -1,26 +1,27 @@
-
-/* p6_1.c using SW0 interrupt
- *
- * User Switch B1 is used to generate interrupt through PC13.
- * The user button is connected to PC13. It has a pull-up resitor 
- * so PC13 stays high when the button is not pressed.
- * When the button is pressed, PC13 becomes low.
- * The falling-edge of PC13 (when switch is pressed) triggers an
- * interrupt from External Interrupt Controller (EXTI).
- * In the interrupt handler, the Timer 2 is started.
- * The green LED is on after 4ms, stays on for 2 ms and after that its off.
- * It serves as a crude way to debounce the switch.
- * The green LED (LD2) is connected to PA5.
- *
- * This program was tested with Keil uVision v5.24a with DFP v2.11.0.
- */
+//Projekt: SoapCar
+//Part: IMB - Intelligent Motor Bridge
+//Head: Elias Dillinger
+//Time Intervall: to long xD
 
 #include "stm32f4xx.h"
+#include <stdio.h>
+
+
+int USART2_write(int c);
+int USART2_read(void);
 int32_t pulseCount = 0; //THIS NEEDS to be int32_t, otherwise it will overflow
 //before the Interrupt kicks in-> took me serveral hours to find out xD
+
 void delayMs(int n);
+void USART2_init(void);
 
 int main(void) {
+    int n; //Counter Variable for UART2
+    char str[80];//String for URART2
+	
+    USART2_init();
+    printf("Test I/O functions by Printing: ELEKTROMINATI\r\n");
+	
     __disable_irq();                    /* global disable IRQs */
 
     RCC->AHB1ENR |= 4;	                /* enable GPIOC clock */
@@ -79,7 +80,6 @@ void TIM2_IRQHandler(void) {
 	pulseCount += 1;//raise the value every time the Handler starts-> every 1ms
 	if(pulseCount == 80 - 1){//after 4ms-> 80-1 because we start to count form 0
 		GPIOA->BSRR = 0x00000020;   /* turn on LED */
-		USART2_write(pulseCount);
 	}
 	if(pulseCount == 100 - 1){//after 5ms-> 100-1 because we start to count form 0
 		GPIOA->BSRR = 0x00200000;   /* turn off LED */
@@ -89,30 +89,70 @@ void TIM2_IRQHandler(void) {
 	}
 	
 }
-/*----------------------------------------------------------------------------
-  Initialize UART pins, Baudrate
- *----------------------------------------------------------------------------*/
+
+/* initialize USART2 to transmit at 9600 Baud */
 void USART2_init (void) {
     RCC->AHB1ENR |= 1;          /* Enable GPIOA clock */
     RCC->APB1ENR |= 0x20000;    /* Enable USART2 clock */
 
-    /* Configure PA2 for USART2_TX */
-    GPIOA->AFR[0] &= ~0x0F00;
-    GPIOA->AFR[0] |=  0x0700;   /* alt7 for USART2 */
-    GPIOA->MODER  &= ~0x0030;
-    GPIOA->MODER  |=  0x0020;   /* enable alternate function for PA2 */
+    /* Configure PA2, PA3 for USART2 TX, RX */
+    GPIOA->AFR[0] &= ~0xFF00;
+    GPIOA->AFR[0] |=  0x7700;   /* alt7 for USART2 */
+    GPIOA->MODER  &= ~0x00F0;
+    GPIOA->MODER  |=  0x00A0;   /* enable alt. function for PA2, PA3 */
 
     USART2->BRR = 0x0683;       /* 9600 baud @ 16 MHz */
-    USART2->CR1 = 0x0008;       /* enable Tx, 8-bit data */
+    USART2->CR1 = 0x000C;       /* enable Tx, Rx, 8-bit data */
     USART2->CR2 = 0x0000;       /* 1 stop bit */
     USART2->CR3 = 0x0000;       /* no flow control */
     USART2->CR1 |= 0x2000;      /* enable USART2 */
 }
+
 /* Write a character to USART2 */
-void USART2_write (int ch) {
+int USART2_write (int ch) {
     while (!(USART2->SR & 0x0080)) {}   // wait until Tx buffer empty
     USART2->DR = (ch & 0xFF);
+    return ch;
 }
+
+/* Read a character from USART2 */
+int USART2_read(void) {
+    while (!(USART2->SR & 0x0020)) {}   // wait until char arrives
+    return USART2->DR;
+}
+
+/* The code below is the interface to the C standard I/O library.
+ * All the I/O are directed to the console, which is UART3.
+ */
+//struct __FILE { int handle; };
+FILE __stdin  = {0};
+FILE __stdout = {1};
+FILE __stderr = {2};
+
+/* Called by C library console/file input
+ * This function echoes the character received.
+ * If the character is '\r', it is substituted by '\n'.
+ */
+int fgetc(FILE *f) {
+    int c;
+
+    c = USART2_read();      /* read the character from console */
+
+    if (c == '\r') {        /* if '\r', after it is echoed, a '\n' is appended*/
+        USART2_write(c);    /* echo */
+        c = '\n';
+    }
+
+    USART2_write(c);        /* echo */
+
+    return c;
+}
+
+/* Called by C library console/file output */
+int fputc(int c, FILE *f) {
+    return USART2_write(c);  /* write the character to console */
+}
+
 
 
 
