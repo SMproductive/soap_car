@@ -24,10 +24,16 @@ int main(void) {
     int n; //Counter Variable for UART2
     char str[80];//String for URART2
     int num = 123; //Test Var for Convert INT to STRING
-    char consoleStr[5]; //Conerter Variale for INT to STRING
+    char StrP[5]; //Conerter Variale for INT to STRING (Period)
+    char StrF[5]; //Conerter Variale for INT to STRING (Frequency)
 	
     USART2_init();
     printf("Test I/O functions by Printing: ELEKTROMINATI\r\n");
+    printf("        X        Elektrominiati:\r\n");
+    printf("       X X       make.\r\n");
+    printf("      X _ X      something.\r\n");
+    printf("     X |_| X     cool.\r\n");
+    printf("    X_______X    today.\r\n");
 	
     __disable_irq();                    /* global disable IRQs */
 
@@ -85,8 +91,14 @@ int main(void) {
         last = current;
      while(!(TIM4->SR & 1)) {}   // wait until UIF set TIM4
         TIM4->SR &= ~1;             // clear UIF TIM4
-	sprintf(consoleStr, "%d", period); //convert int to string
-	printf("%s\r\n", consoleStr);
+        sprintf(StrP, "%d", period); //convert int to string
+	sprintf(StrF, "%d", frequency); //convert int to string
+	printf("Periode T: ");
+	printf("%s", StrP);
+	printf(" ms\t");
+	printf("Frequenz f: ");
+	printf(" Hz");
+	printf("%s\r\n", StrF);
     }
 }
 
