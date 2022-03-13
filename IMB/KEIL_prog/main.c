@@ -33,12 +33,12 @@ int main(void) {
     GPIOA->MODER |=  0x00000400;        /* set pin to output mode */
 	
 	
-    // configure TIM3 to wrap around at 1 Hz
-    RCC->APB1ENR |= 2;              /* enable TIM3 clock */
-    TIM3->PSC = 1600 - 1;           /* divided by 1600 */
-    TIM3->ARR = 10000 - 1;          /* divided by 10000 */
-    TIM3->CNT = 0;                  /* clear timer counter */
-    TIM3->CR1 = 1;                  /* enable TIM3 */
+    // configure TIM4 to wrap around at 1 Hz
+    RCC->APB1ENR |= 2;              /* enable TIM4 clock */
+    TIM4->PSC = 1600 - 1;           /* divided by 1600 */
+    TIM4->ARR = 10000 - 1;          /* divided by 10000 */
+    TIM4->CNT = 0;                  /* clear timer counter */
+    TIM4->CR1 = 1;                  /* enable TIM4 */
 
     /* configure PC13 for push button interrupt */
     GPIOC->MODER &= ~0x0C000000;        /* clear pin mode to input mode */
@@ -55,8 +55,8 @@ int main(void) {
     __enable_irq();                     /* global enable IRQs */
     
     while(1) {
-	while(!(TIM3->SR & 1)) {}   /* wait until UIF set TIM3 */
-        TIM3->SR &= ~1;             /* clear UIF TIM3*/
+	while(!(TIM4->SR & 1)) {}   // wait until UIF set TIM4
+        TIM4->SR &= ~1;             // clear UIF TIM4
 	printf(pulseCount);
     }
 }
