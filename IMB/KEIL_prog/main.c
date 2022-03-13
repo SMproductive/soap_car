@@ -97,8 +97,8 @@ int main(void) {
 	printf("%s", StrP);
 	printf(" ms\t");
 	printf("Frequenz f: ");
-	printf(" Hz");
-	printf("%s\r\n", StrF);
+	printf("%s", StrF);
+	printf(" Hz\r\n");
     }
 }
 
