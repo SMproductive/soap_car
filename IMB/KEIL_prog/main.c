@@ -15,9 +15,16 @@ int32_t pulseCount = 0; //THIS NEEDS to be int32_t, otherwise it will overflow
 void delayMs(int n);
 void USART2_init(void);
 
+int period;
+int frequency;
+
 int main(void) {
+    int last = 0; //For Frequ. measurement
+    int current; //For Frequ. measurement
     int n; //Counter Variable for UART2
     char str[80];//String for URART2
+    int num = 123; //Test Var for Convert INT to STRING
+    char consoleStr[5]; //Conerter Variale for INT to STRING
 	
     USART2_init();
     printf("Test I/O functions by Printing: ELEKTROMINATI\r\n");
@@ -49,15 +56,37 @@ int main(void) {
     EXTI->IMR |= 0x2000;                /* unmask EXTI13 */
     EXTI->FTSR |= 0x2000;               /* select falling edge trigger */
 
-//    NVIC->ISER[1] = 0x00000100;         /* enable IRQ40 (bit 8 of ISER[1]) */
+    //    NVIC->ISER[1] = 0x00000100;         /* enable IRQ40 (bit 8 of ISER[1]) */
     NVIC_EnableIRQ(EXTI15_10_IRQn);
     
     __enable_irq();                     /* global enable IRQs */
+	
+	
+    // configure PA6 as input of TIM3 CH1
+    RCC->AHB1ENR |=  1;             /* enable GPIOA clock */
+    GPIOA->MODER &= ~0x00003000;    /* clear pin mode */
+    GPIOA->MODER |=  0x00002000;    /* set pin to alternate function */
+    GPIOA->AFR[0] &= ~0x0F000000;   /* clear pin AF bits */
+    GPIOA->AFR[0] |= 0x02000000;    /* set pin to AF2 for TIM3 CH1 */
+
+    // configure TIM3 to do input capture with prescaler ...
+    RCC->APB1ENR |= 2;              /* enable TIM3 clock */
+    TIM3->PSC = 16000 - 1;          /* divided by 16000 */
+    TIM3->CCMR1 = 0x41;             /* set CH1 to capture at every edge */
+    TIM3->CCER = 0x0B;              /* enable CH 1 capture both edges */
+    TIM3->CR1 = 1;                  /* enable TIM3 */
     
     while(1) {
-	while(!(TIM4->SR & 1)) {}   // wait until UIF set TIM4
+      while (!(TIM3->SR & 2)) {}  // wait until input edge is captured
+        current = TIM3->CCR1;       // read captured counter value
+        period = (current - last) * 2;    // calculate the period
+        last = current;
+        frequency = 1000 / period;
+        last = current;
+     while(!(TIM4->SR & 1)) {}   // wait until UIF set TIM4
         TIM4->SR &= ~1;             // clear UIF TIM4
-	printf(pulseCount);
+	sprintf(consoleStr, "%d", period); //convert int to string
+	printf("%s\r\n", consoleStr);
     }
 }
 
