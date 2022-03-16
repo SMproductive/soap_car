@@ -19,21 +19,23 @@ int period;
 int frequency;
 
 int main(void) {
-    int last = 0; //For Frequ. measurement
-    int current; //For Frequ. measurement
+	  int last = 0;
+    int current;
     int n; //Counter Variable for UART2
     char str[80];//String for URART2
-    int num = 123; //Test Var for Convert INT to STRING
-    char StrP[5]; //Conerter Variale for INT to STRING (Period)
-    char StrF[5]; //Conerter Variale for INT to STRING (Frequency)
+	  int num = 123;
+	  char StrP[5];
+	  char StrF[5];
 	
     USART2_init();
     printf("Test I/O functions by Printing: ELEKTROMINATI\r\n");
-    printf("        X        Elektrominiati:\r\n");
-    printf("       X X       make.\r\n");
-    printf("      X _ X      something.\r\n");
-    printf("     X |_| X     cool.\r\n");
-    printf("    X_______X    today.\r\n");
+	  printf("        X        Elektrominiati:\r\n");
+	  printf("       X X       make.\r\n");
+	  printf("      X _ X      something.\r\n");
+	  printf("     X |_| X     cool.\r\n");
+	  printf("    X_______X    today.\r\n");
+	
+	
 	
     __disable_irq();                    /* global disable IRQs */
 
@@ -46,12 +48,15 @@ int main(void) {
     GPIOA->MODER |=  0x00000400;        /* set pin to output mode */
 	
 	
-    // configure TIM4 to wrap around at 1 Hz
-    RCC->APB1ENR |= 2;              /* enable TIM4 clock */
+    // setup TIM4 
+		RCC->APB1ENR |= 4;
     TIM4->PSC = 1600 - 1;           /* divided by 1600 */
     TIM4->ARR = 10000 - 1;          /* divided by 10000 */
     TIM4->CNT = 0;                  /* clear timer counter */
     TIM4->CR1 = 1;                  /* enable TIM4 */
+		
+		TIM4->DIER |= 1;                /* enable UIE */
+    NVIC_EnableIRQ(TIM4_IRQn);      /* enable interrupt in NVIC */
 
     /* configure PC13 for push button interrupt */
     GPIOC->MODER &= ~0x0C000000;        /* clear pin mode to input mode */
@@ -62,13 +67,13 @@ int main(void) {
     EXTI->IMR |= 0x2000;                /* unmask EXTI13 */
     EXTI->FTSR |= 0x2000;               /* select falling edge trigger */
 
-    //    NVIC->ISER[1] = 0x00000100;         /* enable IRQ40 (bit 8 of ISER[1]) */
+//    NVIC->ISER[1] = 0x00000100;         /* enable IRQ40 (bit 8 of ISER[1]) */
     NVIC_EnableIRQ(EXTI15_10_IRQn);
     
     __enable_irq();                     /* global enable IRQs */
-	
-	
-    // configure PA6 as input of TIM3 CH1
+		
+		
+		 // configure PA6 as input of TIM3 CH1
     RCC->AHB1ENR |=  1;             /* enable GPIOA clock */
     GPIOA->MODER &= ~0x00003000;    /* clear pin mode */
     GPIOA->MODER |=  0x00002000;    /* set pin to alternate function */
@@ -83,22 +88,13 @@ int main(void) {
     TIM3->CR1 = 1;                  /* enable TIM3 */
     
     while(1) {
-      while (!(TIM3->SR & 2)) {}  // wait until input edge is captured
+			while (!(TIM3->SR & 2)) {}  // wait until input edge is captured
         current = TIM3->CCR1;       // read captured counter value
         period = (current - last) * 2;    // calculate the period
         last = current;
         frequency = 1000 / period;
         last = current;
-     while(!(TIM4->SR & 1)) {}   // wait until UIF set TIM4
-        TIM4->SR &= ~1;             // clear UIF TIM4
-        sprintf(StrP, "%d", period); //convert int to string
-	sprintf(StrF, "%d", frequency); //convert int to string
-	printf("Periode T: ");
-	printf("%s", StrP);
-	printf(" ms\t");
-	printf("Frequenz f: ");
-	printf("%s", StrF);
-	printf(" Hz\r\n");
+				
     }
 }
 
@@ -139,6 +135,19 @@ void TIM2_IRQHandler(void) {
 		pulseCount = 0; //resets counter^^ so we're ready for the next EXTI
 		TIM2->CR1 = 0x0000; //DISABLE the Timer, so we can Synch & Enable the Timer with the next EXTI
 	}
+	
+}
+
+int TIM4_IRQHandler(StrP, StrF){
+	TIM4->SR=0;
+	sprintf(StrP, "%d", period); //convert int to string
+	sprintf(StrF, "%d", frequency); //convert int to string
+	printf("Periode T: ");
+	printf("%s", StrP);
+	printf(" ms\t");
+	printf("Frequenz f: ");
+	printf("%s", StrF);
+	printf(" Hz\r\n");
 	
 }
 
@@ -204,7 +213,6 @@ int fgetc(FILE *f) {
 int fputc(int c, FILE *f) {
     return USART2_write(c);  /* write the character to console */
 }
-
 
 
 
