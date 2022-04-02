@@ -46,29 +46,33 @@ int main(void) {
     /* configure PA5 for LED */
     GPIOA->MODER &= ~0x00000C00;        /* clear pin mode */
     GPIOA->MODER |=  0x00000400;        /* set pin to output mode */
+		
+		//configure PA1 for outTriacP1
+		GPIOA->MODER |= 0x4;
+		
 	
 	
     // setup TIM4 
 		RCC->APB1ENR |= 4;
-    TIM4->PSC = 1600 - 1;           /* divided by 1600 */
-    TIM4->ARR = 10000 - 1;          /* divided by 10000 */
+    TIM4->PSC = 2000 - 1;           // divided by prescaler
+    TIM4->ARR = 100001 - 1;          // divided by reload register
     TIM4->CNT = 0;                  /* clear timer counter */
     TIM4->CR1 = 1;                  /* enable TIM4 */
 		
 		TIM4->DIER |= 1;                /* enable UIE */
     NVIC_EnableIRQ(TIM4_IRQn);      /* enable interrupt in NVIC */
 
-    /* configure PC13 for push button interrupt */
-    GPIOC->MODER &= ~0x0C000000;        /* clear pin mode to input mode */
+    /* configure PA4 for falling interrupt */
+    GPIOA->MODER &= ~0x300;        /* clear pin mode to input mode */
     
-    SYSCFG->EXTICR[3] &= ~0x00F0;       /* clear port selection for EXTI13 */
-    SYSCFG->EXTICR[3] |= 0x0020;        /* select port C for EXTI13 */
+    SYSCFG->EXTICR[1] &= ~0x00F0;       /* clear port selection for EXTI4 */
+    SYSCFG->EXTICR[1] |= 0000;        /* select port A for EXTI4 */
     
-    EXTI->IMR |= 0x2000;                /* unmask EXTI13 */
-    EXTI->FTSR |= 0x2000;               /* select falling edge trigger */
+    EXTI->IMR |= 0x10;                /* unmask EXTI4 */
+    EXTI->FTSR |= 0x10;               /* select falling edge trigger */
 
 //    NVIC->ISER[1] = 0x00000100;         /* enable IRQ40 (bit 8 of ISER[1]) */
-    NVIC_EnableIRQ(EXTI15_10_IRQn);
+    NVIC_EnableIRQ(EXTI4_IRQn);
     
     __enable_irq();                     /* global enable IRQs */
 		
@@ -98,7 +102,7 @@ int main(void) {
     }
 }
 
-void EXTI15_10_IRQHandler(void) {
+void EXTI4_IRQHandler(void) {
     
     /* setup TIM2
     Clock by default at 16 MHz*/
@@ -110,7 +114,7 @@ void EXTI15_10_IRQHandler(void) {
     TIM2->DIER |= 1;                /* enable UIE */
     NVIC_EnableIRQ(TIM2_IRQn);      /* enable interrupt in NVIC */
 
-        EXTI->PR = 0x2000;          /* clear interrupt pending flag */
+        EXTI->PR = 0x10;          /* clear interrupt pending flag */
 }
 
 /* 16 MHz SYSCLK */
@@ -127,10 +131,12 @@ void TIM2_IRQHandler(void) {
 	//Incoming f for EXTI 50 Hz; detection f = 20 kHz
 	pulseCount += 1;//raise the value every time the Handler starts-> every 1ms
 	if(pulseCount == 80 - 1){//after 4ms-> 80-1 because we start to count form 0
-		GPIOA->BSRR = 0x00000020;   /* turn on LED */
+		//GPIOA->BSRR = 0x00000020;   /* turn on LED PA5*/
+		GPIOA->BSRR = 0x2; //turn on PA1 outTriacP1
 	}
 	if(pulseCount == 100 - 1){//after 5ms-> 100-1 because we start to count form 0
-		GPIOA->BSRR = 0x00200000;   /* turn off LED */
+		//GPIOA->BSRR = 0x00200000;   /* turn off LED PA5*/
+		GPIOA->BSRR = 0x20000; //turn off PA1 outTriacP1
 		//IMPORTANT
 		pulseCount = 0; //resets counter^^ so we're ready for the next EXTI
 		TIM2->CR1 = 0x0000; //DISABLE the Timer, so we can Synch & Enable the Timer with the next EXTI
@@ -140,6 +146,12 @@ void TIM2_IRQHandler(void) {
 
 int TIM4_IRQHandler(StrP, StrF){
 	TIM4->SR=0;
+	printOutCLI(StrP, StrF);
+	
+}
+
+
+int printOutCLI (StrP, StrF){
 	sprintf(StrP, "%d", period); //convert int to string
 	sprintf(StrF, "%d", frequency); //convert int to string
 	printf("Periode T: ");
@@ -148,7 +160,6 @@ int TIM4_IRQHandler(StrP, StrF){
 	printf("Frequenz f: ");
 	printf("%s", StrF);
 	printf(" Hz\r\n");
-	
 }
 
 /* initialize USART2 to transmit at 9600 Baud */
@@ -213,6 +224,3 @@ int fgetc(FILE *f) {
 int fputc(int c, FILE *f) {
     return USART2_write(c);  /* write the character to console */
 }
-
-
-
