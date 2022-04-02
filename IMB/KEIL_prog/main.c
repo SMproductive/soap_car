@@ -69,7 +69,8 @@ int main(void) {
     SYSCFG->EXTICR[1] |= 0000;        /* select port A for EXTI4 */
     
     EXTI->IMR |= 0x10;                /* unmask EXTI4 */
-    EXTI->FTSR |= 0x10;               /* select falling edge trigger */
+		//EXTI->FTSR |= 0x10;               /* select falling edge trigger */
+    EXTI->RTSR |= 0x10;               /* select rising edge trigger */
 
 //    NVIC->ISER[1] = 0x00000100;         /* enable IRQ40 (bit 8 of ISER[1]) */
     NVIC_EnableIRQ(EXTI4_IRQn);
