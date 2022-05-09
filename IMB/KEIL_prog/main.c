@@ -15,17 +15,27 @@ int32_t pulseCount = 0; //THIS NEEDS to be int32_t, otherwise it will overflow
 void delayMs(int n);
 void USART2_init(void);
 
-int period;
-int frequency;
+int period; //ext period in ms
+int frequency; //ext f in Hz
+
+int16_t isrCLK = 16000000; //16 MHz Std. Clock
+int16_t isrPSC = 160; //Prescaler
+int16_t isrARR = 5; //Reload Register
+int16_t usercan = 0; //CAN User input 
+int16_t canMaxResolution = 255; //the number who devides the incomming f
+double tripggerPoint; //when the rising edge is set
+double reqPeriod; //how often a request of change is set
+int16_t timeCounts; //added timecounts for the ISR delay to make the rising Edge for the Triac
+
 
 int main(void) {
-	  int last = 0;
+	int last = 0;
     int current;
     int n; //Counter Variable for UART2
     char str[80];//String for URART2
-	  int num = 123;
-	  char StrP[5];
-	  char StrF[5];
+    int num = 123;
+	char StrP[5];
+	char StrF[5];
 	
     USART2_init();
     printf("Test I/O functions by Printing: ELEKTROMINATI\r\n");
@@ -53,13 +63,13 @@ int main(void) {
 	
 	
     // setup TIM4 
-		RCC->APB1ENR |= 4;
+	RCC->APB1ENR |= 4;
     TIM4->PSC = 2000 - 1;           // divided by prescaler
     TIM4->ARR = 100001 - 1;          // divided by reload register
     TIM4->CNT = 0;                  /* clear timer counter */
     TIM4->CR1 = 1;                  /* enable TIM4 */
 		
-		TIM4->DIER |= 1;                /* enable UIE */
+	TIM4->DIER |= 1;                /* enable UIE */
     NVIC_EnableIRQ(TIM4_IRQn);      /* enable interrupt in NVIC */
 
     /* configure PA4 for falling interrupt */
@@ -72,7 +82,7 @@ int main(void) {
 		//EXTI->FTSR |= 0x10;               /* select falling edge trigger */
     EXTI->RTSR |= 0x10;               /* select rising edge trigger */
 
-//    NVIC->ISER[1] = 0x00000100;         /* enable IRQ40 (bit 8 of ISER[1]) */
+    //NVIC->ISER[1] = 0x00000100;         /* enable IRQ40 (bit 8 of ISER[1]) */
     NVIC_EnableIRQ(EXTI4_IRQn);
     
     __enable_irq();                     /* global enable IRQs */
@@ -99,6 +109,10 @@ int main(void) {
         last = current;
         frequency = 1000 / period;
         last = current;
+
+        tripggerPoint = (canMaxResolution / period) * usercan; //where to set the triggerpoint
+        timeCounts = tripggerPoint / reqPeriod; //how often count the minimal resoluton time to get a closed loop
+        
 				
     }
 }
@@ -108,15 +122,17 @@ void EXTI4_IRQHandler(void) {
     /* setup TIM2
     Clock by default at 16 MHz*/
     RCC->APB1ENR |= 1;              /* enable TIM2 clock */
-    TIM2->PSC = 160 - 1;          // divided by 160-> f = 100 kHz
-    TIM2->ARR = 5 - 1;           // divided by 5-> f2 = 10 kHz max! Res = 50 µs-> 1/2 Period time
+    TIM2->PSC = isrPSC - 1;          // divided by 160-> f = 100 kHz
+    TIM2->ARR = isrARR - 1;           // divided by 5-> f2 = 10 kHz max! Res = 50 µs-> 1/2 Period time
     TIM2->CR1 = 0x00010001;      // enable counter in HEX please (debug reason)
 
     TIM2->DIER |= 1;                /* enable UIE */
     NVIC_EnableIRQ(TIM2_IRQn);      /* enable interrupt in NVIC */
 
         EXTI->PR = 0x10;          /* clear interrupt pending flag */
-}
+    
+    reqPeriod = 1000 / ((isrCLK / isrPSC) / isrARR); //to get ms we need 1000 rather than 1
+}   
 
 /* 16 MHz SYSCLK */
 void delayMs(int n) {
@@ -131,7 +147,7 @@ void TIM2_IRQHandler(void) {
   	//GPIOA->ODR ^= 0x20;				/* toggle LED */
 	//Incoming f for EXTI 50 Hz; detection f = 20 kHz
 	pulseCount += 1;//raise the value every time the Handler starts-> every 1ms
-	if(pulseCount == 80 - 1){//after 4ms-> 80-1 because we start to count form 0
+	if(pulseCount == timeCounts - 1){//after 4ms-> 80-1 because we start to count form 0
 		//GPIOA->BSRR = 0x00000020;   /* turn on LED PA5*/
 		GPIOA->BSRR = 0x2; //turn on PA1 outTriacP1
 	}
