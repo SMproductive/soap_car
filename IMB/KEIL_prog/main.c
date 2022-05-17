@@ -20,18 +20,7 @@ int main(void) {
 	  int num = 123;
 	  char StrP[5];
 	  char StrF[5];
-	  GPIOA-> MODER |= 0x20A4;
 
-		USART2_init();
-    printf("Test I/O functions by Printing: ELEKTROMINATI\r\n");
-	  printf("        X        Elektrominiati:\r\n");
-	  printf("       X X       make.\r\n");
-	  printf("      X _ X      something.\r\n");
-	  printf("     X |_| X     cool.\r\n");
-	  printf("    X_______X    today.\r\n");
-	
-	
-	
     __disable_irq();                    /* global disable IRQs */
     RCC->AHB1ENR |= 4;	                /* enable GPIOC clock */
     RCC->AHB1ENR |= 1;                  /* enable GPIOA clock */
@@ -40,6 +29,7 @@ int main(void) {
 		
 		//configure whole GPIOA MODER Reg: 
 		GPIOA-> MODER |= 0x20A4;
+		
     /* configure PA5 for LED */
     //GPIOA->MODER &= ~0x00000C00;        /* clear pin mode */
     //GPIOA->MODER |=  0x00000400;        /* set pin to output mode */
@@ -47,7 +37,13 @@ int main(void) {
 		//configure PA1 for outTriacP1
 		//GPIOA->MODER |= 0x4;
 		
-	
+		USART2_init();
+    printf("Test I/O functions by Printing: ELEKTROMINATI\r\n");
+	  printf("        X        Elektrominiati:\r\n");
+	  printf("       X X       make.\r\n");
+	  printf("      X _ X      something.\r\n");
+	  printf("     X |_| X     cool.\r\n");
+	  printf("    X_______X    today.\r\n");
 	
     // setup TIM4 ext ISR
 		RCC->APB1ENR |= 4;
@@ -135,7 +131,8 @@ void TIM2_IRQHandler(void) {
 }
 int TIM4_IRQHandler(StrP, StrF){
 	TIM4->SR=0;
-	printOutCLI(StrP, StrF);
+	//printOutCLI(StrP, StrF);
+
 	
 }
 int printOutCLI (StrP, StrF){
