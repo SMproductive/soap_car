@@ -6,7 +6,8 @@
 #include <stdio.h>
 int USART2_write(int c);
 int USART2_read(void);
-int32_t pulseCount = 0; //THIS NEEDS to be int32_t, otherwise it will overflow
+int32_t countP1 = 0; //THIS NEEDS to be int32_t, otherwise it will overflow
+int32_t countP2 = 0;
 //before the Interrupt kicks in-> took me serveral hours to find out xD
 void delayMs(int n);
 void USART2_init(void);
@@ -22,20 +23,15 @@ int main(void) {
 	  char StrF[5];
 
     __disable_irq();                    /* global disable IRQs */
-    RCC->AHB1ENR |= 4;	                /* enable GPIOC clock */
-    RCC->AHB1ENR |= 1;                  /* enable GPIOA clock */
+    RCC->AHB1ENR |= 0x7;                  /* enable GPIO A, B C clock */
     RCC->APB2ENR |= 0x4000;             /* enable SYSCFG clock */
+		RCC->APB1ENR |= 0x2001F; //TIM 2,3,4,5,6 UART2 enabled
 		
 		
-		//configure whole GPIOA MODER Reg: 
-		GPIOA-> MODER |= 0x20A4;
-		
-    /* configure PA5 for LED */
-    //GPIOA->MODER &= ~0x00000C00;        /* clear pin mode */
-    //GPIOA->MODER |=  0x00000400;        /* set pin to output mode */
-		
-		//configure PA1 for outTriacP1
-		//GPIOA->MODER |= 0x4;
+		//configure global GPIOA MODER Reg: 
+		GPIOA-> MODER |= 0x5A4A4;
+		//configure global GPIOB MODER Reg
+		GPIOB-> MODER |= 0x0002;
 		
 		USART2_init();
     printf("Test I/O functions by Printing: ELEKTROMINATI\r\n");
@@ -45,39 +41,43 @@ int main(void) {
 	  printf("     X |_| X     cool.\r\n");
 	  printf("    X_______X    today.\r\n");
 	
-    // setup TIM4 ext ISR
-		RCC->APB1ENR |= 4;
+    // setup TIM4 for CLI output 
+		//RCC->APB1ENR |= 0x4; ^^ to global APB1ENR
     TIM4->PSC = 2000 - 1;           // divided by prescaler
     TIM4->ARR = 100001 - 1;          // divided by reload register
     TIM4->CNT = 0;                  /* clear timer counter */
     TIM4->CR1 = 1;                  /* enable TIM4 */
-		
 		TIM4->DIER |= 1;                /* enable UIE */
     NVIC_EnableIRQ(TIM4_IRQn);      /* enable interrupt in NVIC */
-    /* configure PA4 for falling interrupt */
+		
+    /* configure PA4 for rising interrupt */
     //GPIOA->MODER &= ~0x300;        /* clear pin mode to input mode */
-    
-    SYSCFG->EXTICR[1] &= ~0x00F0;       /* clear port selection for EXTI4 */
+    //SYSCFG->EXTICR[1] &= ~0x00F0;       /* clear port selection for EXTI4 */
     SYSCFG->EXTICR[1] |= 0000;        /* select port A for EXTI4 */
-
-    EXTI->IMR |= 0x10;                /* unmask EXTI4 */
+    EXTI->IMR |= 0x10;                /* unmask EXTI4 0x10 == 0d00010000*/
 		//EXTI->FTSR |= 0x10;               /* select falling edge trigger */
     EXTI->RTSR |= 0x10;               /* select rising edge trigger */
-
-//    NVIC->ISER[1] = 0x00000100;         /* enable IRQ40 (bit 8 of ISER[1]) */
+		//NVIC->ISER[1] = 0x00000100;         /* enable IRQ40 (bit 8 of ISER[1]) */
     NVIC_EnableIRQ(EXTI4_IRQn);
-    
+		
+		// configure PB2 for rising interrupt
+		SYSCFG->EXTICR[0] |= 0x100; //slect port B for EXTI2
+		EXTI->IMR |= 0x04; //0x4 == 0d0100
+		EXTI->RTSR |= 0x04;
+		NVIC_EnableIRQ(EXTI2_IRQn);
+
+		
     __enable_irq();                     /* global enable IRQs */
 		
 		
-		 // configure PA6 as input of TIM3 CH1
-    RCC->AHB1ENR |=  1;             /* enable GPIOA clock */
+		// configure PA6 as input of TIM3 CH1
+    //RCC->AHB1ENR |=  1;             /* enable GPIOA clock^^ to global AHB1ENR*/
     //GPIOA->MODER &= ~0x00003000;    /* clear pin mode */
-    //GPIOA->MODER |=  0x00002000;    /* set pin to alternate function */
+    //GPIOA->MODER |=  0x00002000;    /* set pin to alternate function ^^ global MODER*/
     GPIOA->AFR[0] &= ~0x0F000000;   /* clear pin AF bits */
     GPIOA->AFR[0] |= 0x02000000;    /* set pin to AF2 for TIM3 CH1 */
     // configure TIM3 to do input capture with prescaler ...
-    RCC->APB1ENR |= 2;              /* enable TIM3 clock */
+    //RCC->APB1ENR |= 0x2;              /* enable TIM3 clock ^^ global APB1ENR*/
     TIM3->PSC = 16000 - 1;          /* divided by 16000 */
     TIM3->CCMR1 = 0x41;             /* set CH1 to capture at every edge */
     TIM3->CCER = 0x0B;              /* enable CH 1 capture both edges */
@@ -95,15 +95,26 @@ int main(void) {
 }
 void EXTI4_IRQHandler(void) {
     
-    /* setup TIM2
-    Clock by default at 16 MHz*/
-    RCC->APB1ENR |= 1;              /* enable TIM2 clock */
+    // setup TIM2
+    //Clock by default at 16 MHz/
+    //RCC->APB1ENR |= 1;              //enable TIM2 clock ^^ global APB1ENR
     TIM2->PSC = 160 - 1;          // divided by 160-> f = 100 kHz
     TIM2->ARR = 5 - 1;           // divided by 5-> f2 = 10 kHz max! Res = 50 µs-> 1/2 Period time
-    TIM2->CR1 = 0x00010001;      // enable counter in HEX please (debug reason)
-    TIM2->DIER |= 1;                /* enable UIE */
-    NVIC_EnableIRQ(TIM2_IRQn);      /* enable interrupt in NVIC */
-        EXTI->PR = 0x10;          /* clear interrupt pending flag */
+    TIM2->CR1 = 0x0011;      // enable counter in HEX please (debug reason)
+    TIM2->DIER |= 1;                //enable UIE 
+    NVIC_EnableIRQ(TIM2_IRQn);      //enable interrupt in NVIC
+    EXTI->PR = 0x10;          //clear interrupt pending flag
+}
+
+void EXTI2_IRQHandler (void){
+		// setup TIM5
+		//RCC->APB1ENR |= 1; //enable TIM5 CLK
+		TIM5->PSC = 160-1;//divide by 160-> f = 100kHz
+		TIM5->ARR = 5-1; //divide by 5
+		TIM5->CR1 = 0x0011; //enable Counter + Direction UP
+		TIM5-> DIER |= 1;
+		NVIC_EnableIRQ(TIM5_IRQn);
+		EXTI->PR = 0x04;
 }
 /* 16 MHz SYSCLK */
 void delayMs(int n) {
@@ -113,21 +124,34 @@ void delayMs(int n) {
 }
 void TIM2_IRQHandler(void) {
 	TIM2->SR = 0;                   /* clear UIF */
-  	//GPIOA->ODR ^= 0x20;				/* toggle LED */
+	//GPIOA->ODR ^= 0x20;				/* toggle LED */
 	//Incoming f for EXTI 50 Hz; detection f = 20 kHz
-	pulseCount += 1;//raise the value every time the Handler starts-> every 1ms
-	if(pulseCount == 80 - 1){//after 4ms-> 80-1 because we start to count form 0
+	countP1 += 1;//raise the value every time the Handler starts-> every 1ms
+	if(countP1 == 80 - 1){//after 4ms-> 80-1 because we start to count form 0
 		//GPIOA->BSRR = 0x00000020;   /* turn on LED PA5*/
-		GPIOA->BSRR = 0x2; //turn on PA1 outTriacP1
+		GPIOA->BSRR |= 0x2; //turn on PA1 outTriacP1
 	}
-	if(pulseCount == 100 - 1){//after 5ms-> 100-1 because we start to count form 0
+	if(countP1 == 100 - 1){//after 5ms-> 100-1 because we start to count form 0
 		//GPIOA->BSRR = 0x00200000;   /* turn off LED PA5*/
-		GPIOA->BSRR = 0x20000; //turn off PA1 outTriacP1
+		GPIOA->BSRR |= 0x20000; //turn off PA1 outTriacP1
 		//IMPORTANT
-		pulseCount = 0; //resets counter^^ so we're ready for the next EXTI
+		countP1 = 0; //resets counter^^ so we're ready for the next EXTI
 		TIM2->CR1 = 0x0000; //DISABLE the Timer, so we can Synch & Enable the Timer with the next EXTI
 	}
 	
+}
+
+void TIM5_IRQHandler(void){
+	TIM5->SR = 0;
+	countP2 += 1;
+	if(countP2 == 80-1){
+		GPIOA->BSRR |= 0x100; //turn on PA8 outTriacP2
+	}
+	if(countP2 == 100-1){
+		GPIOA->BSRR |= 0x1000000;//turn off PA8
+		countP2 = 0; 
+		TIM5-> CR1 = 0x0000;
+	}
 }
 int TIM4_IRQHandler(StrP, StrF){
 	TIM4->SR=0;
@@ -136,25 +160,25 @@ int TIM4_IRQHandler(StrP, StrF){
 	
 }
 int printOutCLI (StrP, StrF){
-	sprintf(StrP, "%d", period); //convert int to string
-	sprintf(StrF, "%d", frequency); //convert int to string
+	//sprintf(StrP, "%d", period); //convert int to string
+	//sprintf(StrF, "%d", frequency); //convert int to string
 	printf("Periode T: ");
-	printf("%s", StrP);
+	printf("%s", period);
 	printf(" ms\t");
 	printf("Frequenz f: ");
-	printf("%s", StrF);
+	printf("%s", frequency);
 	printf(" Hz\r\n");
 }
 /* initialize USART2 to transmit at 9600 Baud */
 void USART2_init (void) {
-    RCC->AHB1ENR |= 1;          /* Enable GPIOA clock */
-    RCC->APB1ENR |= 0x20000;    /* Enable USART2 clock */
+    //RCC->AHB1ENR |= 1;          /* Enable GPIOA clock ^^global AHB1ENR*/
+    //RCC->APB1ENR |= 0x20000;    /* Enable USART2 clock ^^global APB1ENR*/
     /* Configure PA2, PA3 for USART2 TX, RX */
     GPIOA->AFR[0] &= ~0xFF00;
     GPIOA->AFR[0] |=  0x7700;   /* alt7 for USART2 */
     //GPIOA->MODER  &= ~0x00F0;
     //GPIOA->MODER  |=  0x00A0;   /* enable alt. function for PA2, PA3 */
-		//See global GPIOA-> MODER config   
+		//See global GPIOA-> MODER config  ^^
     USART2->BRR = 0x0683;       /* 9600 baud @ 16 MHz */
     USART2->CR1 = 0x000C;       /* enable Tx, Rx, 8-bit data */
     USART2->CR2 = 0x0000;       /* 1 stop bit */
