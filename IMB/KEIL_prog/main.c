@@ -1,9 +1,10 @@
-//Projekt: SoapCar
+/*Projekt: SoapCar
 //Part: IMB - Intelligent Motor Bridge
 //Head: Elias Dillinger
-//Time Intervall: to long xD
+//Time Intervall: to long xD*/
 #include "stm32f4xx.h"
 #include <stdio.h>
+#include <math.h>
 int USART2_write(int c);
 int USART2_read(void);
 int32_t countP1 = 0; //THIS NEEDS to be int32_t, otherwise it will overflow
@@ -11,8 +12,13 @@ int32_t countP2 = 0;
 //before the Interrupt kicks in-> took me serveral hours to find out xD
 void delayMs(int n);
 void USART2_init(void);
-int period;
-int frequency;
+int period = 0;
+int frequency = 0;
+int df = 100;
+int de = 200;
+int fa = 20000;
+int d = 0;
+int deof = 0;
 int main(void) {
 	  int last = 0;
     int current;
@@ -78,7 +84,7 @@ int main(void) {
     GPIOA->AFR[0] |= 0x02000000;    /* set pin to AF2 for TIM3 CH1 */
     // configure TIM3 to do input capture with prescaler ...
     //RCC->APB1ENR |= 0x2;              /* enable TIM3 clock ^^ global APB1ENR*/
-    TIM3->PSC = 16000 - 1;          /* divided by 16000 */
+    TIM3->PSC = 16 - 1;          /* divided by 16000 f=1MHz...1µs request rate*/
     TIM3->CCMR1 = 0x41;             /* set CH1 to capture at every edge */
     TIM3->CCER = 0x0B;              /* enable CH 1 capture both edges */
     TIM3->CR1 = 1;                  /* enable TIM3 */
@@ -88,7 +94,7 @@ int main(void) {
         current = TIM3->CCR1;       // read captured counter value
         period = (current - last) * 2;    // calculate the period
         last = current;
-        frequency = 1000 / period;
+        frequency = 1000000 / period;
         last = current;
 				
     }
@@ -125,18 +131,19 @@ void delayMs(int n) {
 void TIM2_IRQHandler(void) {
 	TIM2->SR = 0;                   /* clear UIF */
 	//GPIOA->ODR ^= 0x20;				/* toggle LED */
-	//Incoming f for EXTI 50 Hz; detection f = 20 kHz
+	//detection f = 20 kHz
 	countP1 += 1;//raise the value every time the Handler starts-> every 1ms
-	if(countP1 == 80 - 1){//after 4ms-> 80-1 because we start to count form 0
+	if(countP1 == (d/50) - 1){//d*50-1 because d[1µs] EXTI f=20kHz 
 		//GPIOA->BSRR = 0x00000020;   /* turn on LED PA5*/
 		GPIOA->BSRR |= 0x2; //turn on PA1 outTriacP1
 	}
-	if(countP1 == 100 - 1){//after 5ms-> 100-1 because we start to count form 0
+	if(countP1 == deof){//one count step is 50µs => f=20kHz
 		//GPIOA->BSRR = 0x00200000;   /* turn off LED PA5*/
 		GPIOA->BSRR |= 0x20000; //turn off PA1 outTriacP1
 		//IMPORTANT
 		countP1 = 0; //resets counter^^ so we're ready for the next EXTI
 		TIM2->CR1 = 0x0000; //DISABLE the Timer, so we can Synch & Enable the Timer with the next EXTI
+		PID();
 	}
 	
 }
@@ -153,20 +160,24 @@ void TIM5_IRQHandler(void){
 		TIM5-> CR1 = 0x0000;
 	}
 }
-int TIM4_IRQHandler(StrP, StrF){
+void TIM4_IRQHandler(){
 	TIM4->SR=0;
-	//printOutCLI(StrP, StrF);
+	printOutCLI(period,frequency);
 
 	
 }
-int printOutCLI (StrP, StrF){
-	//sprintf(StrP, "%d", period); //convert int to string
-	//sprintf(StrF, "%d", frequency); //convert int to string
+int PID(){
+	d = (period/510) * df -de;
+	deof = (d+de)/50 -1;
+}
+int printOutCLI(period, frequency){
 	printf("Periode T: ");
-	printf("%s", period);
-	printf(" ms\t");
+	printf("%d", (int)period); //convert int to string
+	//printf("%s", period);
+	printf(" micros\t");
 	printf("Frequenz f: ");
-	printf("%s", frequency);
+	printf("%d", (int)((d+de)/50) - 1); //convert int to string
+	//printf("%s", frequency);
 	printf(" Hz\r\n");
 }
 /* initialize USART2 to transmit at 9600 Baud */
@@ -185,7 +196,7 @@ void USART2_init (void) {
     USART2->CR3 = 0x0000;       /* no flow control */
     USART2->CR1 |= 0x2000;      /* enable USART2 */
 }
-/* Write a character to USART2 */
+/* Write a charact			er to USART2 */
 int USART2_write (int ch) {
     while (!(USART2->SR & 0x0080)) {}   // wait until Tx buffer empty
     USART2->DR = (ch & 0xFF);
